@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Penilaian Kinerja Karyawan</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Inter & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js untuk reaktivitas UI -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Chart.js untuk Grafik Analisis -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background: white !important;
+                color: black !important;
+            }
+        }
+
+        /* Clean standard scrollbar without custom arrows */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.5);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col overflow-x-hidden" x-data="appData()"
+    x-init="init()">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- SIDEBAR NAVIGASI -->
+        <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+            class="fixed inset-y-0 left-0 z-50 w-72 bg-indigo-950 text-slate-300 transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-auto flex flex-col shadow-xl no-print flex-shrink-0">
+
+            <!-- Sidebar Header -->
+            <div class="p-6 flex items-center justify-between border-b border-indigo-900">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-900 p-2.5 rounded-xl border border-indigo-800 text-amber-400">
+                        <i class="fa-solid fa-chart-line text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-white font-bold text-base leading-tight">HR Performance</h2>
+                        <p class="text-xs text-indigo-400">Sistem Penilaian Karyawan</p>
+                    </div>
+                </div>
+                <button @click="sidebarOpen = false" class="md:hidden text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Sidebar Links (Tanpa Nomor & Urutan Konsisten) -->
+            <div class="flex-grow px-4 py-6 space-y-1.5 overflow-y-auto">
+                <button @click="activeTab = 'dasbor'; sidebarOpen = false"
+                    :class="activeTab === 'dasbor' ? 'bg-indigo-900 text-white font-semibold shadow-md border border-indigo-800' : 'hover:bg-indigo-900/50 text-slate-300'"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm">
+                    <i class="fa-solid fa-chart-pie w-5 text-emerald-400"></i> Dasbor & Kesesuaian
+                </button>
+                <button @click="activeTab = 'rekap'; sidebarOpen = false"
+                    :class="activeTab === 'rekap' ? 'bg-indigo-900 text-white font-semibold shadow-md border border-indigo-800' : 'hover:bg-indigo-900/50 text-slate-300'"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm">
+                    <i class="fa-solid fa-table-cells w-5 text-indigo-400"></i> Rekapitulasi Bulanan
+                </button>
+                <button @click="activeTab = 'input'; sidebarOpen = false; resetForm();"
+                    :class="activeTab === 'input' ? 'bg-indigo-900 text-white font-semibold shadow-md border border-indigo-800' : 'hover:bg-indigo-900/50 text-slate-300'"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm">
+                    <i class="fa-solid fa-pen-to-square w-5 text-indigo-400"></i> Input Harian
+                </button>
+                <button @click="activeTab = 'riwayat'; sidebarOpen = false"
+                    :class="activeTab === 'riwayat' ? 'bg-indigo-900 text-white font-semibold shadow-md border border-indigo-800' : 'hover:bg-indigo-900/50 text-slate-300'"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm">
+                    <i class="fa-solid fa-clock-rotate-left w-5 text-indigo-400"></i> Riwayat & Catatan Harian
+                </button>
+                <button @click="activeTab = 'karyawan'; sidebarOpen = false"
+                    :class="activeTab === 'karyawan' ? 'bg-indigo-900 text-white font-semibold shadow-md border border-indigo-800' : 'hover:bg-indigo-900/50 text-slate-300'"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm">
+                    <i class="fa-solid fa-users w-5 text-indigo-400"></i> Data Karyawan
+                </button>
+                <button @click="activeTab = 'analitik'; sidebarOpen = false; $nextTick(() => renderCharts())"
+                    :class="activeTab === 'analitik' ? 'bg-indigo-900 text-white font-semibold shadow-md border border-indigo-800' : 'hover:bg-indigo-900/50 text-slate-300'"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm">
+                    <i class="fa-solid fa-chart-column w-5 text-indigo-400"></i> Analitik & Leaderboard
+                </button>
+                <button @click="activeTab = 'backup'; sidebarOpen = false"
+                    :class="activeTab === 'backup' ? 'bg-indigo-900 text-white font-semibold shadow-md border border-indigo-800' : 'hover:bg-indigo-900/50 text-slate-300'"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm">
+                    <i class="fa-solid fa-database w-5 text-amber-400"></i> Cadangan Data (Backup & Restore)
+                </button>
+            </div>
+
+            <!-- Sidebar Footer -->
+            <div class="p-4 border-t border-indigo-900 bg-indigo-950/60 text-xs text-indigo-400 flex flex-col gap-2">
+                <button @click="loadSampleData()"
+                    class="w-full bg-indigo-900 hover:bg-indigo-800 text-white py-2 px-3 rounded-lg transition font-medium flex items-center justify-center gap-2 border border-indigo-800">
+                    <i class="fa-solid fa-rotate text-amber-400"></i> Muat Data Sampel
+                </button>
+                <div class="text-center pt-1 text-slate-500">v5.3 Professional Edition</div>
+            </div>
+        </aside>
+
+        <!-- KONTEN UTAMA (Dengan Dimensi Stabil) -->
+        <div class="flex-grow flex flex-col h-screen overflow-y-auto">
+
+            <!-- Header Atas -->
+            <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30 no-print flex-shrink-0">
+                <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                    <div class="flex items-center gap-4">
+                        <button @click="sidebarOpen = !sidebarOpen"
+                            class="text-slate-700 hover:text-indigo-600 focus:outline-none p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-bars text-xl"></i>
+                        </button>
+                        <div>
+                            <h1 class="text-lg md:text-xl font-bold text-slate-900" x-text="getTabTitle()"></h1>
+                            <p class="text-xs text-slate-500" x-text="currentDateFormatted"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button @click="window.print()"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-print"></i> Cetak
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Area dengan Ukuran Stabil / Min-Height -->
+            <main class="max-w-7xl mx-auto px-6 py-8 flex-grow w-full space-y-8 min-h-[750px]">
+
+                <!-- TAB: DASBOR & KESESUAIAN -->
+                <div x-show="activeTab === 'dasbor'" x-cloak class="space-y-6">
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-800">Dasbor Kesesuaian Karyawan dengan Perusahaan
+                            </h2>
+                            <p class="text-sm text-slate-500 mt-0.5">Indikator keselarasan kinerja (Sesuai &ge; 8,5 |
+                                Cukup 7,5 - 8,49 | Perlu Evaluasi &lt; 7,5).</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-sm font-semibold text-slate-600">Bulan:</label>
+                            <input type="month" x-model="selectedMonth" @change="calculateMonthly()"
+                                class="px-4 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Statistik Kartu Kesesuaian -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div
+                            class="bg-white p-6 rounded-2xl border border-emerald-200 shadow-sm bg-gradient-to-br from-emerald-50/40 to-white flex items-center gap-4">
+                            <div
+                                class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl shadow-sm font-bold">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Karyawan
+                                    Sesuai (&ge; 8,5)</p>
+                                <h3 class="text-3xl font-black text-emerald-900 mt-1" x-text="countAlignment('Sesuai')">
+                                </h3>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Selaras & Melampaui Standar</p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="bg-white p-6 rounded-2xl border border-blue-200 shadow-sm bg-gradient-to-br from-blue-50/40 to-white flex items-center gap-4">
+                            <div
+                                class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-2xl shadow-sm font-bold">
+                                <i class="fa-solid fa-circle-exclamation"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-blue-800 uppercase tracking-wider">Cukup (7,5 -
+                                    8,49)</p>
+                                <h3 class="text-3xl font-black text-blue-900 mt-1" x-text="countAlignment('Cukup')">
+                                </h3>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Perlu Peningkatan Konsistensi</p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="bg-white p-6 rounded-2xl border border-rose-200 shadow-sm bg-gradient-to-br from-rose-50/40 to-white flex items-center gap-4">
+                            <div
+                                class="w-14 h-14 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center text-2xl shadow-sm font-bold">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-rose-800 uppercase tracking-wider">Perlu Evaluasi
+                                    (&lt; 7,5)</p>
+                                <h3 class="text-3xl font-black text-rose-900 mt-1"
+                                    x-text="countAlignment('Perlu Evaluasi')"></h3>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Memerlukan Pembinaan Intensif</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabel Ringkasan Kesesuaian -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-6 border-b border-slate-100">
+                            <h3 class="font-bold text-slate-800 text-base">Detail Keselarasan Karyawan Bulan Ini</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-900 text-white text-xs uppercase tracking-wider">
+                                        <th class="py-3 px-4 font-semibold">Peringkat</th>
+                                        <th class="py-3 px-4 font-semibold">Nama Karyawan</th>
+                                        <th class="py-3 px-4 font-semibold">Jabatan</th>
+                                        <th class="py-3 px-4 font-semibold text-center">Skor Akhir</th>
+                                        <th class="py-3 px-4 font-semibold text-center">Indikator Kesesuaian</th>
+                                        <th class="py-3 px-4 font-semibold">Keterangan & Tindak Lanjut</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 text-xs">
+                                    <template x-for="(item, index) in monthlyLeaderboard" :key="item.nama">
+                                        <tr class="hover:bg-slate-50 transition">
+                                            <td class="py-3 px-4 font-bold text-slate-600" x-text="'#' + (index + 1)">
+                                            </td>
+                                            <td class="py-3 px-4 font-bold text-slate-900" x-text="item.nama"></td>
+                                            <td class="py-3 px-4 text-slate-500" x-text="item.role || 'Staff'"></td>
+                                            <td class="py-3 px-4 text-center font-black text-indigo-600 text-sm"
+                                                x-text="formatID(item.skorAkhir)"></td>
+                                            <td class="py-3 px-4 text-center">
+                                                <span
+                                                    class="inline-block px-3 py-1 rounded-full text-xs font-bold border"
+                                                    :class="{
+                                                        'bg-emerald-100 text-emerald-800 border-emerald-300': getAlignment(item.skorAkhir).label === 'Sesuai',
+                                                        'bg-blue-100 text-blue-800 border-blue-300': getAlignment(item.skorAkhir).label === 'Cukup',
+                                                        'bg-rose-100 text-rose-800 border-rose-300': getAlignment(item.skorAkhir).label === 'Perlu Evaluasi'
+                                                    }" x-text="getAlignment(item.skorAkhir).label"></span>
+                                            </td>
+                                            <td class="py-3 px-4 text-slate-600 font-medium"
+                                                x-text="getAlignment(item.skorAkhir).desc"></td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="monthlyLeaderboard.length === 0">
+                                        <tr>
+                                            <td colspan="6" class="text-center py-12 text-slate-400">Belum ada data
+                                                rekap untuk bulan ini. Silakan lakukan input penilaian harian.</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: REKAPITULASI BULANAN -->
+                <div x-show="activeTab === 'rekap'" x-cloak class="space-y-6">
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-800">Rekapitulasi Kinerja Bulanan</h2>
+                            <p class="text-sm text-slate-500 mt-0.5">Rata-rata sub-kriteria & skor akhir per karyawan.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-sm font-semibold text-slate-600">Bulan:</label>
+                            <input type="month" x-model="selectedMonth" @change="calculateMonthly()"
+                                class="px-4 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <button @click="exportToCSV()"
+                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-2">
+                                <i class="fa-solid fa-file-excel"></i> CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tabel Rekap Granular -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[1200px]">
+                                <thead>
+                                    <tr class="bg-slate-900 text-white text-xs uppercase tracking-wider">
+                                        <th class="py-4 px-4 font-semibold border-r border-slate-700">Karyawan</th>
+                                        <th class="py-4 px-4 font-semibold border-r border-slate-700 bg-indigo-950">1.
+                                            Kinerja & Produktivitas (1-10)</th>
+                                        <th class="py-4 px-4 font-semibold border-r border-slate-700 bg-indigo-950">2.
+                                            Etos Kerja & Dedikasi (1-10)</th>
+                                        <th class="py-4 px-4 font-semibold border-r border-slate-700 bg-amber-950">3.
+                                            Inovasi (Skala 1-4 & Norm 1-10)</th>
+                                        <th class="py-4 px-4 font-semibold border-r border-slate-700 bg-indigo-950">4.
+                                            Sikap & Kolaborasi (1-10)</th>
+                                        <th class="py-4 px-4 font-semibold border-r border-slate-700 bg-indigo-950">5.
+                                            Dampak Perusahaan (1-10)</th>
+                                        <th class="py-4 px-4 font-semibold text-center bg-emerald-950">Skor Akhir</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 text-xs">
+                                    <template x-for="item in monthlyLeaderboard" :key="item.nama">
+                                        <tr class="hover:bg-slate-50 transition">
+                                            <td
+                                                class="py-4 px-4 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/50">
+                                                <div class="text-sm text-indigo-900" x-text="item.nama"></div>
+                                                <div class="text-[10px] text-slate-500 font-normal mt-0.5"
+                                                    x-text="item.role || 'Staff / Karyawan'"></div>
+                                                <div class="text-[10px] text-indigo-600 font-medium mt-1"><span
+                                                        x-text="item.totalHari"></span> Hari Input</div>
+                                            </td>
+
+                                            <!-- Kat 1 -->
+                                            <td class="py-4 px-3 border-r border-slate-200">
+                                                <div class="space-y-1">
+                                                    <div class="flex justify-between"><span>Unit/Hari:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat1_1)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Produk Cacat:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat1_2)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Kepatuhan SOP:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat1_3)"></span>
+                                                    </div>
+                                                    <div
+                                                        class="pt-1.5 mt-1.5 border-t border-indigo-100 flex justify-between font-bold text-indigo-800">
+                                                        <span>Total Skor 1:</span> <span
+                                                            x-text="formatID(item.totalKat1)"></span>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <!-- Kat 2 -->
+                                            <td class="py-4 px-3 border-r border-slate-200">
+                                                <div class="space-y-1">
+                                                    <div class="flex justify-between"><span>Tanggung Jawab:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat2_1)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Inisiatif:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat2_2)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Kedisiplinan:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat2_3)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Loyalitas:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat2_4)"></span>
+                                                    </div>
+                                                    <div
+                                                        class="pt-1.5 mt-1.5 border-t border-indigo-100 flex justify-between font-bold text-indigo-800">
+                                                        <span>Total Skor 2:</span> <span
+                                                            x-text="formatID(item.totalKat2)"></span>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <!-- Kat 3 (Inovasi 1-4) -->
+                                            <td class="py-4 px-3 border-r border-slate-200 bg-amber-50/20">
+                                                <div class="space-y-1 text-amber-900">
+                                                    <div class="flex justify-between"><span>Ide Baru:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat3_1)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Dampak:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat3_2)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Penerapan:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat3_3)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Kreatif:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat3_4)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Kolaborasi:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat3_5)"></span>
+                                                    </div>
+                                                    <div
+                                                        class="pt-1.5 mt-1.5 border-t border-amber-200 flex justify-between font-bold text-amber-950">
+                                                        <span>Total Asli (1-4):</span> <span
+                                                            x-text="formatID(item.totalKat3Asli)"></span>
+                                                    </div>
+                                                    <div
+                                                        class="flex justify-between font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                                        <span>Norm. (1-10):</span> <span
+                                                            x-text="formatID(item.totalKat3Norm)"></span>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <!-- Kat 4 -->
+                                            <td class="py-4 px-3 border-r border-slate-200">
+                                                <div class="space-y-1">
+                                                    <div class="flex justify-between"><span>Sikap/Prof:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat4_1)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Komunikasi:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat4_2)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Kerja Tim:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat4_3)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Feedback:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat4_4)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Kepedulian:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat4_5)"></span>
+                                                    </div>
+                                                    <div
+                                                        class="pt-1.5 mt-1.5 border-t border-indigo-100 flex justify-between font-bold text-indigo-800">
+                                                        <span>Total Skor 4:</span> <span
+                                                            x-text="formatID(item.totalKat4)"></span>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <!-- Kat 5 -->
+                                            <td class="py-4 px-3 border-r border-slate-200">
+                                                <div class="space-y-1">
+                                                    <div class="flex justify-between"><span>Kinerja/Prod:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat5_1)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Efisiensi:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat5_2)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Perbaikan:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat5_3)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Loyalitas:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat5_4)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between"><span>Pengaruh Tim:</span> <span
+                                                            class="font-semibold" x-text="formatID(item.kat5_5)"></span>
+                                                    </div>
+                                                    <div
+                                                        class="pt-1.5 mt-1.5 border-t border-indigo-100 flex justify-between font-bold text-indigo-800">
+                                                        <span>Total Skor 5:</span> <span
+                                                            x-text="formatID(item.totalKat5)"></span>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <!-- Skor Akhir -->
+                                            <td class="py-4 px-4 text-center bg-emerald-50/50">
+                                                <div class="text-xl font-black text-emerald-700"
+                                                    x-text="formatID(item.skorAkhir)"></div>
+                                                <div class="mt-2">
+                                                    <span
+                                                        class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm"
+                                                        :class="{
+                                                            'bg-emerald-100 text-emerald-800': item.status === 'Baik Sekali',
+                                                            'bg-blue-100 text-blue-800': item.status === 'Baik',
+                                                            'bg-amber-100 text-amber-800': item.status === 'Cukup',
+                                                            'bg-rose-100 text-rose-800': item.status === 'Perlu Pembinaan'
+                                                        }" x-text="item.status"></span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="monthlyLeaderboard.length === 0">
+                                        <tr>
+                                            <td colspan="7" class="text-center py-12 text-slate-400">Belum ada rekap
+                                                data untuk bulan ini.</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: INPUT HARIAN -->
+                <div x-show="activeTab === 'input'" x-cloak class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                        <div class="border-b border-slate-100 pb-4 mb-6 flex justify-between items-center">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-800"
+                                    x-text="editingIndex !== null ? 'Perbarui Catatan Penilaian Harian' : 'Form Pencatatan Nilai Kinerja Harian'">
+                                </h2>
+                                <p class="text-sm text-slate-500 mt-1">Mendukung format koma (<span
+                                        class="text-indigo-600 font-semibold">9,5</span>) atau titik (<span
+                                        class="text-indigo-600 font-semibold">9.5</span>).</p>
+                            </div>
+                            <template x-if="editingIndex !== null">
+                                <button @click="cancelEdit()"
+                                    class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition">
+                                    <i class="fa-solid fa-xmark mr-1"></i> Batal Edit
+                                </button>
+                            </template>
+                        </div>
+
+                        <form @submit.prevent="saveDailyRecord" class="space-y-8">
+                            <!-- Informasi Dasar & Karyawan -->
+                            <div
+                                class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                <div>
+                                    <label
+                                        class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Pilih
+                                        Karyawan *</label>
+                                    <select x-model="form.nama" required
+                                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition">
+                                        <option value="">-- Pilih Karyawan --</option>
+                                        <template x-for="emp in employees" :key="emp.name">
+                                            <option :value="emp.name" x-text="emp.name + ' (' + emp.role + ')'">
+                                            </option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label
+                                        class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Tanggal
+                                        Penilaian *</label>
+                                    <input type="date" x-model="form.tanggal" required
+                                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label
+                                        class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Catatan
+                                        Harian</label>
+                                    <textarea x-model="form.catatan" rows="2"
+                                        placeholder="Tuliskan catatan harian, kendala, atau prestasi khusus hari ini..."
+                                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Kategori 1: Kinerja & Produktivitas -->
+                            <div class="space-y-4">
+                                <div class="border-b border-indigo-100 pb-2">
+                                    <h3 class="font-bold text-indigo-900 text-base flex items-center gap-2">
+                                        <span
+                                            class="bg-indigo-100 text-indigo-700 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold">1</span>
+                                        Kategori: Nilai Kinerja & Produktivitas <span
+                                            class="text-xs font-normal text-slate-500">(Skala 1 - 10)</span>
+                                    </h3>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Jumlah unit
+                                            diproduksi/hari</label>
+                                        <input type="text" x-model="form.kat1_1" required placeholder="9,4"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Jumlah Produk
+                                            Cacat</label>
+                                        <input type="text" x-model="form.kat1_2" required placeholder="10"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Kepatuhan terhadap
+                                            SOP</label>
+                                        <input type="text" x-model="form.kat1_3" required placeholder="9,5"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kategori 2: Etos Kerja & Dedikasi -->
+                            <div class="space-y-4">
+                                <div class="border-b border-indigo-100 pb-2">
+                                    <h3 class="font-bold text-indigo-900 text-base flex items-center gap-2">
+                                        <span
+                                            class="bg-indigo-100 text-indigo-700 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold">2</span>
+                                        Kategori: Nilai Etos Kerja & Dedikasi <span
+                                            class="text-xs font-normal text-slate-500">(Skala 1 - 10)</span>
+                                    </h3>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Tanggung jawab
+                                            kerja</label>
+                                        <input type="text" x-model="form.kat2_1" required placeholder="9,5"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Inisiatif dan
+                                            Proaktif</label>
+                                        <input type="text" x-model="form.kat2_2" required placeholder="9"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Kedisiplinan &
+                                            Kepatuhan</label>
+                                        <input type="text" x-model="form.kat2_3" required placeholder="9"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Semangat dan
+                                            Loyalitas</label>
+                                        <input type="text" x-model="form.kat2_4" required placeholder="10"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kategori 3: Inovasi dan Kreatifitas (Skala 1 - 4) -->
+                            <div class="space-y-4 bg-amber-50/70 p-5 rounded-2xl border border-amber-200">
+                                <div class="flex items-center justify-between border-b border-amber-200 pb-2">
+                                    <h3 class="font-bold text-amber-900 text-base flex items-center gap-2">
+                                        <span
+                                            class="bg-amber-200 text-amber-800 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold">3</span>
+                                        Kategori: Inovasi dan Kreatifitas <span
+                                            class="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">SKALA
+                                            1 - 4</span>
+                                    </h3>
+                                    <span class="text-xs text-amber-700 italic">Otomatis dinormalisasi ke skala
+                                        1-10</span>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                    <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Jumlah ide baru
+                                            (1-4)</label>
+                                        <input type="text" x-model="form.kat3_1" required placeholder="4"
+                                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Dampak inovasi
+                                            (1-4)</label>
+                                        <input type="text" x-model="form.kat3_2" required placeholder="4"
+                                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Penerapan ide
+                                            (1-4)</label>
+                                        <input type="text" x-model="form.kat3_3" required placeholder="4"
+                                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Berpikir kreatif
+                                            (1-4)</label>
+                                        <input type="text" x-model="form.kat3_4" required placeholder="3,9"
+                                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Kolaborasi inovasi
+                                            (1-4)</label>
+                                        <input type="text" x-model="form.kat3_5" required placeholder="4"
+                                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kategori 4: Sikap dan Kolaborasi -->
+                            <div class="space-y-4">
+                                <div class="border-b border-indigo-100 pb-2">
+                                    <h3 class="font-bold text-indigo-900 text-base flex items-center gap-2">
+                                        <span
+                                            class="bg-indigo-100 text-indigo-700 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold">4</span>
+                                        Kategori: Sikap dan Kolaborasi <span
+                                            class="text-xs font-normal text-slate-500">(Skala 1 - 10)</span>
+                                    </h3>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Sikap positif &
+                                            Prof.</label>
+                                        <input type="text" x-model="form.kat4_1" required placeholder="9,5"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Komunikasi
+                                            efektif</label>
+                                        <input type="text" x-model="form.kat4_2" required placeholder="9,8"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Kerja sama
+                                            tim</label>
+                                        <input type="text" x-model="form.kat4_3" required placeholder="10"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Respon
+                                            feedback</label>
+                                        <input type="text" x-model="form.kat4_4" required placeholder="10"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Kepedulian
+                                            rekan</label>
+                                        <input type="text" x-model="form.kat4_5" required placeholder="9,5"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kategori 5: Dampak karyawan terhadap perusahaan -->
+                            <div class="space-y-4">
+                                <div class="border-b border-indigo-100 pb-2">
+                                    <h3 class="font-bold text-indigo-900 text-base flex items-center gap-2">
+                                        <span
+                                            class="bg-indigo-100 text-indigo-700 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold">5</span>
+                                        Kategori: Dampak Karyawan terhadap Perusahaan <span
+                                            class="text-xs font-normal text-slate-500">(Skala 1 - 10)</span>
+                                    </h3>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Kinerja &
+                                            Produktivitas</label>
+                                        <input type="text" x-model="form.kat5_1" required placeholder="9,5"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Efisiensi &
+                                            Penghematan</label>
+                                        <input type="text" x-model="form.kat5_2" required placeholder="10"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Inovasi &
+                                            Perbaikan</label>
+                                        <input type="text" x-model="form.kat5_3" required placeholder="10"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Loyalitas &
+                                            Retensi</label>
+                                        <input type="text" x-model="form.kat5_4" required placeholder="9"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <label class="block text-xs font-medium text-slate-700 mb-1">Pengaruh dalam
+                                            tim</label>
+                                        <input type="text" x-model="form.kat5_5" required placeholder="10"
+                                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tombol Aksi -->
+                            <div class="pt-4 flex items-center justify-end gap-4 border-t border-slate-200">
+                                <button type="button" @click="resetForm()"
+                                    class="px-6 py-2.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 font-medium text-sm transition">
+                                    Reset Form
+                                </button>
+                                <button type="submit"
+                                    class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2">
+                                    <i class="fa-solid fa-floppy-disk"></i> <span
+                                        x-text="editingIndex !== null ? 'Perbarui Data Harian' : 'Simpan Penilaian'"></span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- TAB: RIWAYAT & CATATAN HARIAN -->
+                <div x-show="activeTab === 'riwayat'" x-cloak class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <div
+                            class="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-100 pb-4 mb-6">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-800">Riwayat Penilaian Harian</h2>
+                                <p class="text-sm text-slate-500 mt-0.5">Daftar catatan harian dan sub-kriteria karyawan
+                                    (Data tersimpan otomatis di localStorage).</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button @click="exportDailyCSV()"
+                                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-2">
+                                    <i class="fa-solid fa-file-excel"></i> Download CSV Riwayat
+                                </button>
+                                <button
+                                    @click="confirmAction('Hapus semua riwayat catatan harian?', () => clearAllRecords())"
+                                    class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition">
+                                    <i class="fa-solid fa-trash-can mr-1.5"></i> Hapus Semua Riwayat
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr
+                                        class="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                                        <th class="py-3 px-4 font-semibold">Tanggal</th>
+                                        <th class="py-3 px-4 font-semibold">Nama Karyawan</th>
+                                        <th class="py-3 px-4 font-semibold">Catatan Harian</th>
+                                        <th class="py-3 px-4 font-semibold text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-sm">
+                                    <template x-for="(record, index) in dailyRecords" :key="index">
+                                        <tr class="hover:bg-slate-50 transition">
+                                            <td class="py-3 px-4 font-medium text-slate-600 whitespace-nowrap"
+                                                x-text="record.tanggal"></td>
+                                            <td class="py-3 px-4 font-semibold text-slate-900" x-text="record.nama">
+                                            </td>
+                                            <td class="py-3 px-4 text-slate-500 text-xs max-w-sm truncate"
+                                                x-text="record.catatan || '-'"></td>
+                                            <td class="py-3 px-4 text-center relative">
+                                                <!-- Dropdown Aksi Kompak -->
+                                                <div class="relative inline-block text-left" x-data="{ open: false }">
+                                                    <button @click="open = !open" @click.away="open = false"
+                                                        class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition flex items-center gap-1.5 mx-auto">
+                                                        <span>Aksi</span>
+                                                        <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                                                    </button>
+                                                    <div x-show="open" x-cloak
+                                                        class="absolute right-0 mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-20 text-left">
+                                                        <button @click="open = false; openDetail(record)"
+                                                            class="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2">
+                                                            <i class="fa-solid fa-eye w-4"></i> Detail
+                                                        </button>
+                                                        <button @click="open = false; editRecord(index)"
+                                                            class="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700 flex items-center gap-2">
+                                                            <i class="fa-solid fa-pen-to-square w-4"></i> Edit
+                                                        </button>
+                                                        <button
+                                                            @click="open = false; confirmAction('Hapus catatan harian ini?', () => deleteRecord(index))"
+                                                            class="w-full text-left px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2">
+                                                            <i class="fa-solid fa-trash w-4"></i> Hapus
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="dailyRecords.length === 0">
+                                        <tr>
+                                            <td colspan="4" class="text-center py-12 text-slate-400">Belum ada riwayat
+                                                catatan harian. Silakan lakukan input melalui menu <strong>Input
+                                                    Harian</strong>.</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: DATA KARYAWAN -->
+                <div x-show="activeTab === 'karyawan'" x-cloak class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                        <div
+                            class="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-100 pb-4 mb-6">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-800">Manajemen Data Karyawan</h2>
+                                <p class="text-sm text-slate-500 mt-0.5">Tambah, ubah, atau hapus daftar karyawan tim
+                                    Anda.</p>
+                            </div>
+                            <button @click="openEmployeeModal()"
+                                class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md transition flex items-center gap-2">
+                                <i class="fa-solid fa-user-plus"></i> Tambah Karyawan Baru
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <template x-for="(emp, idx) in employees" :key="emp.name">
+                                <div
+                                    class="bg-slate-50 border border-slate-200 p-5 rounded-2xl relative flex flex-col justify-between shadow-sm">
+                                    <div>
+                                        <div class="flex items-center gap-3 mb-3">
+                                            <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-base"
+                                                x-text="emp.name.charAt(0)"></div>
+                                            <div>
+                                                <h4 class="font-bold text-slate-900 text-base" x-text="emp.name"></h4>
+                                                <p class="text-xs text-indigo-600 font-medium"
+                                                    x-text="emp.role || 'Staff / Karyawan'"></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                                        <button @click="editEmployee(idx)"
+                                            class="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-medium transition">
+                                            <i class="fa-solid fa-pen mr-1"></i> Edit
+                                        </button>
+                                        <button
+                                            @click="confirmAction('Hapus karyawan ' + emp.name + '?', () => deleteEmployee(idx))"
+                                            class="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-medium transition">
+                                            <i class="fa-solid fa-trash mr-1"></i> Hapus
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: ANALITIK & LEADERBOARD -->
+                <div x-show="activeTab === 'analitik'" x-cloak class="space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <template x-for="(item, index) in monthlyLeaderboard" :key="item.nama">
+                            <div class="bg-white rounded-2xl p-6 border shadow-sm relative overflow-hidden transition hover:shadow-md"
+                                :class="{
+                                    'border-amber-300 bg-gradient-to-br from-amber-50/50 to-white': index === 0,
+                                    'border-slate-300 bg-gradient-to-br from-slate-50/80 to-white': index === 1,
+                                    'border-amber-700/30 bg-gradient-to-br from-amber-950/5 to-white': index === 2,
+                                    'border-slate-200': index > 2
+                                }">
+                                <div class="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shadow-sm"
+                                    :class="{
+                                        'bg-amber-400 text-white': index === 0,
+                                        'bg-slate-300 text-slate-800': index === 1,
+                                        'bg-amber-700 text-white': index === 2,
+                                        'bg-slate-100 text-slate-600': index > 2
+                                    }">
+                                    <span x-text="'#' + (index + 1)"></span>
+                                </div>
+                                <div class="mb-3">
+                                    <span
+                                        class="text-xs font-semibold px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700"
+                                        x-text="item.role || 'Staff'"></span>
+                                    <h4 class="text-lg font-bold text-slate-900 mt-2" x-text="item.nama"></h4>
+                                </div>
+                                <div class="my-4 py-3 border-y border-slate-100 flex items-center justify-between">
+                                    <span class="text-xs font-semibold text-slate-600 uppercase">Skor Akhir</span>
+                                    <span class="text-2xl font-black text-indigo-600"
+                                        x-text="formatID(item.skorAkhir)"></span>
+                                </div>
+                                <div class="mb-4">
+                                    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold" :class="{
+                                            'bg-emerald-100 text-emerald-800': item.status === 'Baik Sekali',
+                                            'bg-blue-100 text-blue-800': item.status === 'Baik',
+                                            'bg-amber-100 text-amber-800': item.status === 'Cukup',
+                                            'bg-rose-100 text-rose-800': item.status === 'Perlu Pembinaan'
+                                        }" x-text="item.status"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Grafik Chart.js -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-slate-800 text-base mb-4">Grafik Perbandingan Kinerja Karyawan</h3>
+                        <div class="relative h-80 w-full">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: CADANGAN DATA (BACKUP & RESTORE) -->
+                <div x-show="activeTab === 'backup'" x-cloak class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 space-y-8">
+                        <div class="border-b border-slate-100 pb-4">
+                            <h2 class="text-xl font-bold text-slate-800">Cadangan & Pemulihan Data (Backup & Restore)
+                            </h2>
+                            <p class="text-sm text-slate-500 mt-1">Amankan data penilaian dan karyawan Anda. Unduh file
+                                cadangan secara berkala agar data tidak hilang saat HP di-reset atau browser
+                                dibersihkan.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Backup Section -->
+                            <div
+                                class="bg-indigo-50/50 border border-indigo-200 p-6 rounded-2xl flex flex-col justify-between space-y-4">
+                                <div>
+                                    <div
+                                        class="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xl mb-4 shadow-sm">
+                                        <i class="fa-solid fa-download"></i>
+                                    </div>
+                                    <h3 class="font-bold text-indigo-900 text-lg">1. Ekspor Cadangan (Backup)</h3>
+                                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">Mengunduh seluruh database
+                                        aplikasi (data karyawan dan riwayat harian) ke dalam satu file berformat JSON.
+                                    </p>
+                                </div>
+                                <button @click="exportJSONBackup()"
+                                    class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-file-arrow-down text-sm"></i> Unduh File Cadangan (.JSON)
+                                </button>
+                            </div>
+
+                            <!-- Restore Section -->
+                            <div
+                                class="bg-emerald-50/50 border border-emerald-200 p-6 rounded-2xl flex flex-col justify-between space-y-4">
+                                <div>
+                                    <div
+                                        class="w-12 h-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-xl mb-4 shadow-sm">
+                                        <i class="fa-solid fa-upload"></i>
+                                    </div>
+                                    <h3 class="font-bold text-emerald-900 text-lg">2. Pulihkan Data (Restore)</h3>
+                                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">Unggah file cadangan JSON
+                                        yang sebelumnya pernah diunduh untuk mengembalikan seluruh data Anda seketika.
+                                    </p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-emerald-900 mb-2">Pilih File Cadangan
+                                        (.json):</label>
+                                    <input type="file" id="restoreFile" accept=".json"
+                                        @change="importJSONBackup($event)"
+                                        class="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 file:cursor-pointer bg-white border border-emerald-300 rounded-xl p-2">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+
+            <!-- FOOTER -->
+            <footer
+                class="bg-white border-t border-slate-200 mt-auto py-6 text-center text-xs text-slate-500 no-print flex-shrink-0">
+                <p>&copy; 2026 Aplikasi Penilaian Kinerja Karyawan — Backup & Restore Ready.</p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL HARIAN -->
+    <div x-show="showDetailModal" x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Rincian Penilaian Harian</h3>
+                    <p class="text-xs text-indigo-600 font-semibold mt-0.5"
+                        x-text="detailRecord.nama + ' — ' + detailRecord.tanggal"></p>
+                </div>
+                <button @click="showDetailModal = false"
+                    class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Catatan Harian -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Catatan
+                    Harian:</span>
+                <p class="text-sm text-slate-700" x-text="detailRecord.catatan || 'Tidak ada catatan harian.'"></p>
+            </div>
+
+            <!-- Grid Skor Sub-Kriteria -->
+            <div class="space-y-4 text-xs">
+                <div class="border border-slate-200 rounded-xl p-3 bg-white">
+                    <div class="font-bold text-indigo-900 mb-2 border-b pb-1">1. Kinerja & Produktivitas</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>Unit/Hari: <span class="font-semibold" x-text="detailRecord.kat1_1"></span></div>
+                        <div>Produk Cacat: <span class="font-semibold" x-text="detailRecord.kat1_2"></span></div>
+                        <div>Kepatuhan SOP: <span class="font-semibold" x-text="detailRecord.kat1_3"></span></div>
+                    </div>
+                </div>
+
+                <div class="border border-slate-200 rounded-xl p-3 bg-white">
+                    <div class="font-bold text-indigo-900 mb-2 border-b pb-1">2. Etos Kerja & Dedikasi</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>Tanggung Jawab: <span class="font-semibold" x-text="detailRecord.kat2_1"></span></div>
+                        <div>Inisiatif: <span class="font-semibold" x-text="detailRecord.kat2_2"></span></div>
+                        <div>Kedisiplinan: <span class="font-semibold" x-text="detailRecord.kat2_3"></span></div>
+                        <div>Loyalitas: <span class="font-semibold" x-text="detailRecord.kat2_4"></span></div>
+                    </div>
+                </div>
+
+                <div class="border border-amber-200 rounded-xl p-3 bg-amber-50/30">
+                    <div class="font-bold text-amber-900 mb-2 border-b border-amber-200 pb-1">3. Inovasi & Kreatifitas
+                        (Skala 1-4)</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-amber-950">
+                        <div>Ide Baru: <span class="font-semibold" x-text="detailRecord.kat3_1"></span></div>
+                        <div>Dampak: <span class="font-semibold" x-text="detailRecord.kat3_2"></span></div>
+                        <div>Penerapan: <span class="font-semibold" x-text="detailRecord.kat3_3"></span></div>
+                        <div>Kreatif: <span class="font-semibold" x-text="detailRecord.kat3_4"></span></div>
+                        <div>Kolaborasi: <span class="font-semibold" x-text="detailRecord.kat3_5"></span></div>
+                    </div>
+                </div>
+
+                <div class="border border-slate-200 rounded-xl p-3 bg-white">
+                    <div class="font-bold text-indigo-900 mb-2 border-b pb-1">4. Sikap dan Kolaborasi</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>Sikap/Prof: <span class="font-semibold" x-text="detailRecord.kat4_1"></span></div>
+                        <div>Komunikasi: <span class="font-semibold" x-text="detailRecord.kat4_2"></span></div>
+                        <div>Kerja Tim: <span class="font-semibold" x-text="detailRecord.kat4_3"></span></div>
+                        <div>Feedback: <span class="font-semibold" x-text="detailRecord.kat4_4"></span></div>
+                        <div>Kepedulian: <span class="font-semibold" x-text="detailRecord.kat4_5"></span></div>
+                    </div>
+                </div>
+
+                <div class="border border-slate-200 rounded-xl p-3 bg-white">
+                    <div class="font-bold text-indigo-900 mb-2 border-b pb-1">5. Dampak Karyawan terhadap Perusahaan
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>Kinerja/Prod: <span class="font-semibold" x-text="detailRecord.kat5_1"></span></div>
+                        <div>Efisiensi: <span class="font-semibold" x-text="detailRecord.kat5_2"></span></div>
+                        <div>Perbaikan: <span class="font-semibold" x-text="detailRecord.kat5_3"></span></div>
+                        <div>Loyalitas: <span class="font-semibold" x-text="detailRecord.kat5_4"></span></div>
+                        <div>Pengaruh Tim: <span class="font-semibold" x-text="detailRecord.kat5_5"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 flex justify-end">
+                <button @click="showDetailModal = false"
+                    class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL KELOLA KARYAWAN -->
+    <div x-show="showEmpModal" x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8 space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                <h3 class="text-lg font-bold text-slate-900"
+                    x-text="empModalIndex !== null ? 'Edit Karyawan' : 'Tambah Karyawan Baru'"></h3>
+                <button @click="showEmpModal = false"
+                    class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form @submit.prevent="saveEmployee" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Nama
+                        Karyawan *</label>
+                    <input type="text" x-model="empForm.name" required placeholder="Contoh: Budi Santoso"
+                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Jabatan /
+                        Posisi *</label>
+                    <input type="text" x-model="empForm.role" required placeholder="Contoh: Operator Produksi / Staff"
+                        class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition">
+                </div>
+                <div class="pt-4 flex justify-end gap-3 border-t border-slate-100">
+                    <button type="button" @click="showEmpModal = false"
+                        class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition">
+                        Batal
+                    </button>
+                    <button type="submit"
+                        class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md transition">
+                        Simpan Karyawan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL KONFIRMASI KUSTOM -->
+    <div x-show="showConfirmModal" x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-6">
+            <div
+                class="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-2xl shadow-inner">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">Konfirmasi Aksi</h3>
+                <p class="text-sm text-slate-500 mt-2" x-text="confirmMessage"></p>
+            </div>
+            <div class="flex justify-center gap-3 pt-2">
+                <button @click="showConfirmModal = false"
+                    class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition w-full">
+                    Batal
+                </button>
+                <button @click="confirmCallback(); showConfirmModal = false;"
+                    class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-md transition w-full">
+                    Ya, Lanjutkan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifikasi Toast -->
+    <div x-show="toast.show" x-cloak
+        class="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-slate-800 transition transform duration-300">
+        <i :class="toast.icon" class="text-lg"></i>
+        <span class="text-sm font-medium" x-text="toast.message"></span>
+    </div>
+
+    <!-- Logika Alpine.js & Chart.js -->
+    <script>
+        let myChartInstance = null;
+
+        function appData() {
+            return {
+                sidebarOpen: false,
+                activeTab: 'dasbor',
+                currentDateFormatted: '',
+                selectedMonth: new Date().toISOString().slice(0, 7),
+
+                // Karyawan Default
+                employees: [
+                    { name: 'Ilham', role: 'Operator Produksi A' },
+                    { name: 'Farham', role: 'Operator Produksi B' },
+                    { name: 'Nandi', role: 'Operator Produksi C' },
+                    { name: 'Fikri', role: 'Staff Administrasi' }
+                ],
+
+                dailyRecords: [], // Kosong sesuai permintaan agar diisi user dari awal
+                monthlyLeaderboard: [],
+                editingIndex: null,
+
+                // Modals
+                showDetailModal: false,
+                detailRecord: {},
+                showEmpModal: false,
+                empModalIndex: null,
+                empForm: { name: '', role: '' },
+
+                showConfirmModal: false,
+                confirmMessage: '',
+                confirmCallback: null,
+
+                toast: { show: false, message: '', icon: 'fa-solid fa-circle-check text-emerald-400' },
+
+                form: {
+                    nama: '',
+                    tanggal: new Date().toISOString().slice(0, 10),
+                    catatan: '',
+                    kat1_1: '', kat1_2: '', kat1_3: '',
+                    kat2_1: '', kat2_2: '', kat2_3: '', kat2_4: '',
+                    kat3_1: '', kat3_2: '', kat3_3: '', kat3_4: '', kat3_5: '',
+                    kat4_1: '', kat4_2: '', kat4_3: '', kat4_4: '', kat4_5: '',
+                    kat5_1: '', kat5_2: '', kat5_3: '', kat5_4: '', kat5_5: ''
+                },
+
+                init() {
+                    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                    this.currentDateFormatted = new Date().toLocaleDateString('id-ID', options);
+
+                    // Load Employees
+                    const savedEmp = localStorage.getItem('app_employees_v5');
+                    if (savedEmp) {
+                        try { this.employees = JSON.parse(savedEmp); } catch (e) { }
+                    }
+
+                    // Load Records
+                    const savedRec = localStorage.getItem('daily_eval_granular_v5');
+                    if (savedRec) {
+                        try { this.dailyRecords = JSON.parse(savedRec); } catch (e) { }
+                    }
+
+                    this.calculateMonthly();
+
+                    this.$watch('selectedMonth', () => {
+                        this.calculateMonthly();
+                    });
+                },
+
+                getTabTitle() {
+                    switch (this.activeTab) {
+                        case 'input': return 'Form Input Nilai Harian';
+                        case 'riwayat': return 'Riwayat & Catatan Harian';
+                        case 'karyawan': return 'Manajemen Data Karyawan';
+                        case 'backup': return 'Cadangan Data (Backup & Restore)';
+                        case 'rekap': return 'Rekapitulasi Kinerja Bulanan';
+                        case 'analitik': return 'Analitik & Leaderboard';
+                        case 'dasbor': return 'Dasbor & Kesesuaian dengan Perusahaan';
+                        default: return 'Aplikasi Penilaian Kinerja';
+                    }
+                },
+
+                getAlignment(score) {
+                    if (score >= 8.5) return { label: 'Sesuai', desc: 'Kinerja sangat selaras dan melampaui standar perusahaan.' };
+                    if (score >= 7.5) return { label: 'Cukup', desc: 'Kinerja baik, perlu sedikit peningkatan konsistensi.' };
+                    return { label: 'Perlu Evaluasi', desc: 'Memerlukan pembinaan dan evaluasi mendalam.' };
+                },
+
+                countAlignment(type) {
+                    return this.monthlyLeaderboard.filter(item => this.getAlignment(item.skorAkhir).label === type).length;
+                },
+
+                parseVal(val) {
+                    if (val === '' || val === null || val === undefined) return 0;
+                    if (typeof val === 'number') return val;
+                    let s = String(val).trim().replace(',', '.');
+                    let n = parseFloat(s);
+                    return isNaN(n) ? 0 : n;
+                },
+
+                formatID(num) {
+                    if (isNaN(num)) return '0';
+                    return Number(num).toFixed(1).replace('.', ',');
+                },
+
+                showToast(msg, type = 'success') {
+                    this.toast.message = msg;
+                    this.toast.icon = type === 'success' ? 'fa-solid fa-circle-check text-emerald-400' : 'fa-solid fa-triangle-exclamation text-amber-400';
+                    this.toast.show = true;
+                    setTimeout(() => { this.toast.show = false; }, 3500);
+                },
+
+                confirmAction(msg, callback) {
+                    this.confirmMessage = msg;
+                    this.confirmCallback = callback;
+                    this.showConfirmModal = true;
+                },
+
+                persistEmployees() {
+                    localStorage.setItem('app_employees_v5', JSON.stringify(this.employees));
+                },
+
+                persistData() {
+                    localStorage.setItem('daily_eval_granular_v5', JSON.stringify(this.dailyRecords));
+                },
+
+                openEmployeeModal() {
+                    this.empModalIndex = null;
+                    this.empForm = { name: '', role: '' };
+                    this.showEmpModal = true;
+                },
+
+                editEmployee(idx) {
+                    this.empModalIndex = idx;
+                    this.empForm = JSON.parse(JSON.stringify(this.employees[idx]));
+                    this.showEmpModal = true;
+                },
+
+                saveEmployee() {
+                    if (this.empModalIndex !== null) {
+                        this.employees[this.empModalIndex] = JSON.parse(JSON.stringify(this.empForm));
+                        this.showToast('Data karyawan berhasil diperbarui.');
+                    } else {
+                        this.employees.push(JSON.parse(JSON.stringify(this.empForm)));
+                        this.showToast('Karyawan baru berhasil ditambahkan.');
+                    }
+                    this.persistEmployees();
+                    this.showEmpModal = false;
+                },
+
+                deleteEmployee(idx) {
+                    this.employees.splice(idx, 1);
+                    this.persistEmployees();
+                    this.showToast('Karyawan berhasil dihapus.');
+                },
+
+                saveDailyRecord() {
+                    if (this.editingIndex !== null) {
+                        this.dailyRecords[this.editingIndex] = JSON.parse(JSON.stringify(this.form));
+                        this.showToast('Catatan penilaian harian berhasil diperbarui!');
+                        this.editingIndex = null;
+                    } else {
+                        this.dailyRecords.push(JSON.parse(JSON.stringify(this.form)));
+                        this.showToast('Penilaian harian berhasil disimpan!');
+                    }
+                    this.persistData();
+                    this.calculateMonthly();
+                    this.resetForm();
+                    this.activeTab = 'riwayat';
+                },
+
+                editRecord(index) {
+                    this.editingIndex = index;
+                    this.form = JSON.parse(JSON.stringify(this.dailyRecords[index]));
+                    this.activeTab = 'input';
+                },
+
+                cancelEdit() {
+                    this.editingIndex = null;
+                    this.resetForm();
+                },
+
+                openDetail(record) {
+                    this.detailRecord = record;
+                    this.showDetailModal = true;
+                },
+
+                deleteRecord(index) {
+                    this.dailyRecords.splice(index, 1);
+                    this.persistData();
+                    this.calculateMonthly();
+                    this.showToast('Catatan harian berhasil dihapus.');
+                },
+
+                clearAllRecords() {
+                    this.dailyRecords = [];
+                    this.persistData();
+                    this.calculateMonthly();
+                    this.showToast('Semua riwayat berhasil dikosongkan.');
+                },
+
+                resetForm() {
+                    this.form.nama = '';
+                    this.form.catatan = '';
+                    this.form.tanggal = new Date().toISOString().slice(0, 10);
+                    for (let i = 1; i <= 3; i++) this.form[`kat1_${i}`] = '';
+                    for (let i = 1; i <= 4; i++) this.form[`kat2_${i}`] = '';
+                    for (let i = 1; i <= 5; i++) {
+                        this.form[`kat3_${i}`] = '';
+                        this.form[`kat4_${i}`] = '';
+                        this.form[`kat5_${i}`] = '';
+                    }
+                    this.editingIndex = null;
+                },
+
+                calculateMonthly() {
+                    const monthStr = this.selectedMonth;
+                    const filtered = this.dailyRecords.filter(r => r.tanggal && r.tanggal.startsWith(monthStr));
+
+                    const grouped = {};
+                    filtered.forEach(r => {
+                        if (!grouped[r.nama]) {
+                            const empObj = this.employees.find(e => e.name === r.nama);
+                            grouped[r.nama] = {
+                                nama: r.nama,
+                                role: empObj ? empObj.role : 'Staff',
+                                count: 0,
+                                s1_1: 0, s1_2: 0, s1_3: 0,
+                                s2_1: 0, s2_2: 0, s2_3: 0, s2_4: 0,
+                                s3_1: 0, s3_2: 0, s3_3: 0, s3_4: 0, s3_5: 0,
+                                s4_1: 0, s4_2: 0, s4_3: 0, s4_4: 0, s4_5: 0,
+                                s5_1: 0, s5_2: 0, s5_3: 0, s5_4: 0, s5_5: 0
+                            };
+                        }
+                        let g = grouped[r.nama];
+                        g.count += 1;
+
+                        g.s1_1 += this.parseVal(r.kat1_1); g.s1_2 += this.parseVal(r.kat1_2); g.s1_3 += this.parseVal(r.kat1_3);
+                        g.s2_1 += this.parseVal(r.kat2_1); g.s2_2 += this.parseVal(r.kat2_2); g.s2_3 += this.parseVal(r.kat2_3); g.s2_4 += this.parseVal(r.kat2_4);
+                        g.s3_1 += this.parseVal(r.kat3_1); g.s3_2 += this.parseVal(r.kat3_2); g.s3_3 += this.parseVal(r.kat3_3); g.s3_4 += this.parseVal(r.kat3_4); g.s3_5 += this.parseVal(r.kat3_5);
+                        g.s4_1 += this.parseVal(r.kat4_1); g.s4_2 += this.parseVal(r.kat4_2); g.s4_3 += this.parseVal(r.kat4_3); g.s4_4 += this.parseVal(r.kat4_4); g.s4_5 += this.parseVal(r.kat4_5);
+                        g.s5_1 += this.parseVal(r.kat5_1); g.s5_2 += this.parseVal(r.kat5_2); g.s5_3 += this.parseVal(r.kat5_3); g.s5_4 += this.parseVal(r.kat5_4); g.s5_5 += this.parseVal(r.kat5_5);
+                    });
+
+                    let list = [];
+                    for (let key in grouped) {
+                        let g = grouped[key];
+                        let c = g.count;
+
+                        let kat1_1 = g.s1_1 / c, kat1_2 = g.s1_2 / c, kat1_3 = g.s1_3 / c;
+                        let totalKat1 = (kat1_1 + kat1_2 + kat1_3) / 3;
+
+                        let kat2_1 = g.s2_1 / c, kat2_2 = g.s2_2 / c, kat2_3 = g.s2_3 / c, kat2_4 = g.s2_4 / c;
+                        let totalKat2 = (kat2_1 + kat2_2 + kat2_3 + kat2_4) / 4;
+
+                        let kat3_1 = g.s3_1 / c, kat3_2 = g.s3_2 / c, kat3_3 = g.s3_3 / c, kat3_4 = g.s3_4 / c, kat3_5 = g.s3_5 / c;
+                        let totalKat3Asli = (kat3_1 + kat3_2 + kat3_3 + kat3_4 + kat3_5) / 5;
+                        let totalKat3Norm = (totalKat3Asli / 4) * 10;
+
+                        let kat4_1 = g.s4_1 / c, kat4_2 = g.s4_2 / c, kat4_3 = g.s4_3 / c, kat4_4 = g.s4_4 / c, kat4_5 = g.s4_5 / c;
+                        let totalKat4 = (kat4_1 + kat4_2 + kat4_3 + kat4_4 + kat4_5) / 5;
+
+                        let kat5_1 = g.s5_1 / c, kat5_2 = g.s5_2 / c, kat5_3 = g.s5_3 / c, kat5_4 = g.s5_4 / c, kat5_5 = g.s5_5 / c;
+                        let totalKat5 = (kat5_1 + kat5_2 + kat5_3 + kat5_4 + kat5_5) / 5;
+
+                        let skorAkhir = (totalKat1 + totalKat2 + totalKat3Norm + totalKat4 + totalKat5) / 5;
+
+                        let status = 'Perlu Pembinaan';
+                        if (skorAkhir >= 8.5) status = 'Baik Sekali';
+                        else if (skorAkhir >= 7.0) status = 'Baik';
+                        else if (skorAkhir >= 5.5) status = 'Cukup';
+
+                        list.push({
+                            nama: g.nama,
+                            role: g.role,
+                            totalHari: c,
+                            kat1_1, kat1_2, kat1_3, totalKat1,
+                            kat2_1, kat2_2, kat2_3, kat2_4, totalKat2,
+                            kat3_1, kat3_2, kat3_3, kat3_4, kat3_5, totalKat3Asli, totalKat3Norm,
+                            kat4_1, kat4_2, kat4_3, kat4_4, kat4_5, totalKat4,
+                            kat5_1, kat5_2, kat5_3, kat5_4, kat5_5, totalKat5,
+                            skorAkhir, status
+                        });
+                    }
+
+                    list.sort((a, b) => b.skorAkhir - a.skorAkhir);
+                    this.monthlyLeaderboard = list;
+                },
+
+                loadSampleData() {
+                    const mPrefix = new Date().toISOString().slice(0, 7);
+                    this.dailyRecords = [
+                        {
+                            nama: 'Ilham', tanggal: `${mPrefix}-01`, catatan: 'Produksi stabil dan target harian tercapai dengan sangat baik.',
+                            kat1_1: '9,4', kat1_2: '10', kat1_3: '9,5',
+                            kat2_1: '10', kat2_2: '9', kat2_3: '9', kat2_4: '10',
+                            kat3_1: '4', kat3_2: '4', kat3_3: '4', kat3_4: '3,9', kat3_5: '4',
+                            kat4_1: '9,5', kat4_2: '9,8', kat4_3: '10', kat4_4: '10', kat4_5: '9,5',
+                            kat5_1: '9,5', kat5_2: '10', kat5_3: '10', kat5_4: '9', kat5_5: '10'
+                        },
+                        {
+                            nama: 'Farham', tanggal: `${mPrefix}-01`, catatan: 'Aktif membantu rekan kerja menyelesaikan kendala.',
+                            kat1_1: '9,3', kat1_2: '9,5', kat1_3: '9',
+                            kat2_1: '9,5', kat2_2: '8,8', kat2_3: '9', kat2_4: '9,5',
+                            kat3_1: '4', kat3_2: '4', kat3_3: '4', kat3_4: '4', kat3_5: '4',
+                            kat4_1: '9,5', kat4_2: '9,5', kat4_3: '9,3', kat4_4: '9', kat4_5: '9',
+                            kat5_1: '9', kat5_2: '9', kat5_3: '9', kat5_4: '9', kat5_5: '9'
+                        },
+                        {
+                            nama: 'Nandi', tanggal: `${mPrefix}-01`, catatan: 'Koordinasi tim sangat baik dan disiplin.',
+                            kat1_1: '9,3', kat1_2: '9,5', kat1_3: '9',
+                            kat2_1: '9,3', kat2_2: '8,9', kat2_3: '9', kat2_4: '9,5',
+                            kat3_1: '4', kat3_2: '4', kat3_3: '4', kat3_4: '3', kat3_5: '4',
+                            kat4_1: '9,5', kat4_2: '9,5', kat4_3: '9,5', kat4_4: '9,3', kat4_5: '9',
+                            kat5_1: '9,4', kat5_2: '9,3', kat5_3: '9', kat5_4: '9', kat5_5: '9'
+                        },
+                        {
+                            nama: 'Fikri', tanggal: `${mPrefix}-01`, catatan: 'Laporan administrasi selesai tepat waktu.',
+                            kat1_1: '9,2', kat1_2: '9,0', kat1_3: '9,2',
+                            kat2_1: '9,1', kat2_2: '8,7', kat2_3: '8,9', kat2_4: '9,2',
+                            kat3_1: '4', kat3_2: '3', kat3_3: '4', kat3_4: '3', kat3_5: '3',
+                            kat4_1: '9,2', kat4_2: '9,4', kat4_3: '9,1', kat4_4: '9,2', kat4_5: '9,0',
+                            kat5_1: '9,1', kat5_2: '9,2', kat5_3: '9,1', kat5_4: '8,8', kat5_5: '9,0'
+                        }
+                    ];
+                    this.persistData();
+                    this.calculateMonthly();
+                    this.showToast('Data sampel berhasil dimuat.');
+                },
+
+                exportJSONBackup() {
+                    const backupObj = {
+                        version: '5.3',
+                        exportDate: new Date().toISOString(),
+                        employees: this.employees,
+                        dailyRecords: this.dailyRecords
+                    };
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+                    const a = document.createElement('a');
+                    a.setAttribute("href", dataStr);
+                    a.setAttribute("download", `backup_kinerja_karyawan_${new Date().toISOString().slice(0, 10)}.json`);
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    this.showToast('File cadangan (.JSON) berhasil diunduh!');
+                },
+
+                importJSONBackup(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const parsed = JSON.parse(e.target.result);
+                            if (parsed.employees && parsed.dailyRecords) {
+                                this.employees = parsed.employees;
+                                this.dailyRecords = parsed.dailyRecords;
+                                this.persistEmployees();
+                                this.persistData();
+                                this.calculateMonthly();
+                                this.showToast('Pemulihan data (Restore) berhasil! Semua data telah kembali.');
+                            } else {
+                                this.showToast('Format file cadangan tidak valid.', 'error');
+                            }
+                        } catch (err) {
+                            this.showToast('Gagal membaca file JSON.', 'error');
+                        }
+                        event.target.value = '';
+                    };
+                    reader.readAsText(file);
+                },
+
+                renderCharts() {
+                    const ctx = document.getElementById('performanceChart');
+                    if (!ctx) return;
+                    if (myChartInstance) myChartInstance.destroy();
+
+                    const labels = this.monthlyLeaderboard.map(i => i.nama);
+                    const scores = this.monthlyLeaderboard.map(i => i.skorAkhir);
+
+                    myChartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Skor Akhir Kinerja',
+                                data: scores,
+                                backgroundColor: ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b'],
+                                borderRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true, max: 10 }
+                            }
+                        }
+                    });
+                },
+
+                exportToCSV() {
+                    if (this.monthlyLeaderboard.length === 0) {
+                        this.showToast('Tidak ada data untuk diekspor.', 'error');
+                        return;
+                    }
+                    let csv = 'Nama,Jabatan,Skor Akhir,Status\n';
+                    this.monthlyLeaderboard.forEach(i => {
+                        csv += `"${i.nama}","${i.role}",${this.formatID(i.skorAkhir)},"${i.status}"\n`;
+                    });
+
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.setAttribute('href', url);
+                    a.setAttribute('download', `rekap_kinerja_${this.selectedMonth}.csv`);
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    this.showToast('Laporan CSV berhasil diunduh.');
+                },
+
+                exportDailyCSV() {
+                    if (this.dailyRecords.length === 0) {
+                        this.showToast('Tidak ada riwayat untuk diekspor.', 'error');
+                        return;
+                    }
+                    let csv = 'Tanggal,Nama Karyawan,Catatan,Kat 1 (Prod),Kat 2 (Etos),Kat 3 (Inovasi Asli),Kat 4 (Sikap),Kat 5 (Dampak)\n';
+                    this.dailyRecords.forEach(r => {
+                        let kat1Avg = ((this.parseVal(r.kat1_1) + this.parseVal(r.kat1_2) + this.parseVal(r.kat1_3)) / 3).toFixed(2);
+                        let kat2Avg = ((this.parseVal(r.kat2_1) + this.parseVal(r.kat2_2) + this.parseVal(r.kat2_3) + this.parseVal(r.kat2_4)) / 4).toFixed(2);
+                        let kat3Avg = ((this.parseVal(r.kat3_1) + this.parseVal(r.kat3_2) + this.parseVal(r.kat3_3) + this.parseVal(r.kat3_4) + this.parseVal(r.kat3_5)) / 5).toFixed(2);
+                        let kat4Avg = ((this.parseVal(r.kat4_1) + this.parseVal(r.kat4_2) + this.parseVal(r.kat4_3) + this.parseVal(r.kat4_4) + this.parseVal(r.kat4_5)) / 5).toFixed(2);
+                        let kat5Avg = ((this.parseVal(r.kat5_1) + this.parseVal(r.kat5_2) + this.parseVal(r.kat5_3) + this.parseVal(r.kat5_4) + this.parseVal(r.kat5_5)) / 5).toFixed(2);
+
+                        let safeCatatan = (r.catatan || '').replace(/"/g, '""');
+                        csv += `"${r.tanggal}","${r.nama}","${safeCatatan}",${kat1Avg},${kat2Avg},${kat3Avg},${kat4Avg},${kat5Avg}\n`;
+                    });
+
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.setAttribute('href', url);
+                    a.setAttribute('download', `riwayat_harian_penilaian.csv`);
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    this.showToast('Riwayat CSV berhasil diunduh.');
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
